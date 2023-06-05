@@ -16,6 +16,8 @@ import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
+import org.elasticsearch.index.query.functionscore.ScoreFunctionBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.sort.SortBuilders;
@@ -39,9 +41,20 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
         try {
             SearchRequest request = new SearchRequest("hotel");
             buildBasicQuery(params, request);
+
+            //分页
             int page = params.getPage();
             int size = params.getSize();
             request.source().from((page - 1) * size).size(size);
+            //排序
+            String location = params.getLocation();
+            if (!StringUtils.isEmpty(location)) {
+                request.source().sort(SortBuilders
+                        .geoDistanceSort("location", new GeoPoint(location))
+                        .order(SortOrder.ASC)
+                        .unit(DistanceUnit.KILOMETERS)
+                );
+            }
             SearchResponse response = client.search(request, RequestOptions.DEFAULT);
             return handleResponse(response);
         } catch (IOException e) {
@@ -79,15 +92,16 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
         if (maxPrice != null) {
             boolQuery.filter(QueryBuilders.rangeQuery("price").lte(maxPrice));
         }
-        request.source().query(boolQuery);
-        String location = params.getLocation();
-        if (!StringUtils.isEmpty(location)) {
-            request.source().sort(SortBuilders
-                    .geoDistanceSort("location", new GeoPoint(location))
-                    .order(SortOrder.ASC)
-                    .unit(DistanceUnit.KILOMETERS)
-            );
-        }
+
+        FunctionScoreQueryBuilder scoreQuery = QueryBuilders.functionScoreQuery(
+                boolQuery,
+                new FunctionScoreQueryBuilder.FilterFunctionBuilder[]{
+                        new FunctionScoreQueryBuilder.FilterFunctionBuilder(
+                                QueryBuilders.termQuery("isAD", true),
+                                ScoreFunctionBuilders.weightFactorFunction(10)
+                        )
+                });
+        request.source().query(scoreQuery);
     }
 
     private PageResult handleResponse(SearchResponse response) {
@@ -108,4 +122,5 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
         }
         return new PageResult(total, hotels);
     }
+
 }
