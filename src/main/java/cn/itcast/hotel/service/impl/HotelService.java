@@ -69,10 +69,12 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
     }
 
     @Override
-    public Map<String, List<String>> filters() {
+    public Map<String, List<String>> filters(RequestParams params) {
         try {
             SearchRequest request = new SearchRequest("hotel");
             request.source().size(0);
+            buildBasicQuery(params, request);
+
             buildAggregation(request);
             SearchResponse response = client.search(request, RequestOptions.DEFAULT);
 
