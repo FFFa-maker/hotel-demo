@@ -20,6 +20,10 @@ import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.index.query.functionscore.ScoreFunctionBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
+import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +32,9 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHotelService {
@@ -60,6 +66,56 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
         } catch (IOException e) {
             throw new RuntimeException();
         }
+    }
+
+    @Override
+    public Map<String, List<String>> filters() {
+        try {
+            SearchRequest request = new SearchRequest("hotel");
+            request.source().size(0);
+            buildAggregation(request);
+            SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+            return handleAggregation(response, "city", "brand");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private void buildAggregation(SearchRequest request) {
+        request.source().aggregation(
+                AggregationBuilders
+                        .terms("city_agg")
+                        .field("city")
+                        .size(100)
+        );
+//        request.source().aggregation(
+//                AggregationBuilders
+//                        .terms("starName_agg")
+//                        .field("starName")
+//                        .size(100)
+//        );
+        request.source().aggregation(
+                AggregationBuilders
+                        .terms("brand_agg")
+                        .field("brand")
+                        .size(100)
+        );
+    }
+
+    private Map<String, List<String>> handleAggregation(SearchResponse response, String... agg){
+        Map<String, List<String>> map = new HashMap<>();
+        Aggregations aggregations = response.getAggregations();
+        for (String term : agg) {
+            List<String> list = new ArrayList<>();
+            map.put(term, list);
+            Terms brandTerms = aggregations.get(term+"_agg");
+            for (Terms.Bucket bucket : brandTerms.getBuckets()) {
+                list.add(bucket.getKeyAsString());
+            }
+        }
+        return map;
     }
 
     private void buildBasicQuery(RequestParams params, SearchRequest request) {
