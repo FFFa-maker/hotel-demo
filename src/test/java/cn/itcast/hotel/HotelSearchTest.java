@@ -15,6 +15,10 @@ import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.search.suggest.Suggest;
+import org.elasticsearch.search.suggest.SuggestBuilder;
+import org.elasticsearch.search.suggest.SuggestBuilders;
+import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +29,7 @@ import java.io.IOException;
 import java.util.Map;
 
 @SpringBootTest
-public class HotelSearch {
+public class HotelSearchTest {
     private RestHighLevelClient client;
 
     @Test
@@ -77,6 +81,29 @@ public class HotelSearch {
     }
 
     @Test
+    void testSuggestion() throws IOException {
+        SearchRequest request = new SearchRequest("hotel");
+        request.source()
+                .suggest(new SuggestBuilder()
+                        .addSuggestion(
+                                "mySuggestion",
+                                SuggestBuilders
+                                        .completionSuggestion("suggestion")
+                                        .prefix("h")
+                                        .skipDuplicates(true)
+                                        .size(10)
+                        ));
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+//        System.out.println(response);
+        Suggest suggest = response.getSuggest();
+        CompletionSuggestion suggestion = suggest.getSuggestion("mySuggestion");
+        for (CompletionSuggestion.Entry.Option option : suggestion.getOptions()) {
+            String text = option.getText().string();
+            System.out.println(text);
+        }
+    }
+
+    @Test
     void testHighLight() throws IOException {
         SearchRequest request = new SearchRequest("hotel");
         request.source()
@@ -87,9 +114,9 @@ public class HotelSearch {
         SearchHit[] hits = response.getHits().getHits();
         for (SearchHit hit : hits) {
             Map<String, HighlightField> highlightFields = hit.getHighlightFields();
-            if(!CollectionUtils.isEmpty(highlightFields)){
+            if (!CollectionUtils.isEmpty(highlightFields)) {
                 HighlightField highlightField = highlightFields.get("name");
-                if(highlightField!=null){
+                if (highlightField != null) {
                     String name = highlightField.getFragments()[0].string();
                     System.out.println(name);
                 }
