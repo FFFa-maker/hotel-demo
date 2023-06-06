@@ -20,12 +20,15 @@ import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.index.query.functionscore.ScoreFunctionBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.search.suggest.Suggest;
+import org.elasticsearch.search.suggest.SuggestBuilder;
+import org.elasticsearch.search.suggest.SuggestBuilders;
+import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -83,6 +86,32 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
             throw new RuntimeException(e);
         }
 
+    }
+
+    @Override
+    public List<String> suggestion(String key) {
+        try {
+            SearchRequest request = new SearchRequest("hotel");
+            request.source().suggest(new SuggestBuilder()
+                    .addSuggestion("mySuggestion",
+                            SuggestBuilders
+                                    .completionSuggestion("suggestion")
+                                    .prefix(key)
+                                    .skipDuplicates(true)
+                                    .size(10)
+                    ));
+            SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+            Suggest suggest = response.getSuggest();
+            CompletionSuggestion suggestion = suggest.getSuggestion("mySuggestion");
+            List<CompletionSuggestion.Entry.Option> options = suggestion.getOptions();
+            List<String> result = new ArrayList<>(options.size());
+            for (CompletionSuggestion.Entry.Option option : options) {
+                result.add(option.getText().string());
+            }
+            return result;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void buildAggregation(SearchRequest request) {

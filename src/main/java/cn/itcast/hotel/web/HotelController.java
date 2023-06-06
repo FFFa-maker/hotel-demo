@@ -4,7 +4,6 @@ import cn.itcast.hotel.pojo.PageResult;
 import cn.itcast.hotel.pojo.RequestParams;
 import cn.itcast.hotel.service.IHotelService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,13 +17,18 @@ public class HotelController {
     private IHotelService hotelService;
 
     @PostMapping("/list")
-    public PageResult search(@RequestBody RequestParams requestParams){
+    public PageResult search(@RequestBody RequestParams requestParams) {
         return hotelService.search(requestParams);
     }
 
     @PostMapping("/filters")
-    public Map<String, List<String>> filters(@RequestBody RequestParams requestParams){
+    public Map<String, List<String>> filters(@RequestBody RequestParams requestParams) {
         return hotelService.filters(requestParams);
     }
 
+    @GetMapping("/suggestion")
+    public List<String> suggestion(@RequestParam("key") String key) {
+
+        return hotelService.suggestion(key);
+    }
 }
